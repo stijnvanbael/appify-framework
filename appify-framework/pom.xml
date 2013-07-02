@@ -1,0 +1,60 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>be.appify.framework</groupId>
+    <artifactId>appify-framework</artifactId>
+    <version>0.1.8-SNAPSHOT</version>
+    <name>Appify Framework</name>
+    <packaging>pom</packaging>
+    <modules>
+        <module>appify-framework-api</module>
+        <module>appify-framework-gae</module>
+        <module>appify-framework-jpa</module>
+        <module>appify-framework-bom</module>
+        <module>appify-framework-google</module>
+        <module>appify-framework-common</module>
+        <module>appify-framework-test</module>
+        <module>appify-framework-wunderground</module>
+    </modules>
+    <properties>
+        <gae.version>1.7.2</gae.version>
+        <jetty.version>7.6.3.v20120416</jetty.version>
+    </properties>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <source>1.6</source>
+                        <target>1.6</target>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-release-plugin</artifactId>
+                    <configuration>
+                        <tagBase>https://svn-appify.forge.cloudbees.com/appify/tags/be/appify</tagBase>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+    
+	<distributionManagement>
+		<repository>
+			<id>appify-release</id>
+			<name>Appify Release Repository</name>
+			<url>dav:https://repository-appify.forge.cloudbees.com/release</url>
+		</repository>
+		<snapshotRepository>
+			<id>appify-snapshot</id>
+			<name>Appify Snapshot repository</name>
+			<url>dav:https://repository-appify.forge.cloudbees.com/snapshot</url>
+			<uniqueVersion>false</uniqueVersion>
+		</snapshotRepository>
+	</distributionManagement>
+
+	<scm>
+		<developerConnection>scm:svn:https://svn-appify.forge.cloudbees.com/appify/trunk/be/appify/appify-framework</developerConnection>
+	</scm>
+</project>

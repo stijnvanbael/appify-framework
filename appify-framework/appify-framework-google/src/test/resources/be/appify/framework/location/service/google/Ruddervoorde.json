@@ -1,0 +1,31 @@
+
+{
+   "html_attributions" : [],
+   "results" : [
+      {
+         "formatted_address" : "Ruddervoorde, Oostkamp, Belgium",
+         "geometry" : {
+            "location" : {
+               "lat" : 51.0959410,
+               "lng" : 3.20651930
+            },
+            "viewport" : {
+               "northeast" : {
+                  "lat" : 51.11146840,
+                  "lng" : 3.25182010
+               },
+               "southwest" : {
+                  "lat" : 51.05607999999999,
+                  "lng" : 3.150440
+               }
+            }
+         },
+         "icon" : "http://maps.gstatic.com/mapfiles/place_api/icons/geocode-71.png",
+         "id" : "00cfab5a960a9a2372c3e6e18a27621b57c967a7",
+         "name" : "Ruddervoorde",
+         "reference" : "CoQBcwAAANP1ZwUa9sFFfAQ-xaD5yPjEQc5F3XDtZpYbwTki4zskP6zjBjsEqighgG3sY9EOnqdLUFBfrIz8llV8DwhivQhak47Yih-xca9fzEN0WQWdavtrZ581KLd0dMfwn3W-gxqSxEghlTtoHRieJxqRebrva1bamrBpMoh565W0I3Y0EhCHNX5-CFvkFcBC3Igc4qPMGhSerC5x_9emlLTSr1Vdj3DJhh9TXg",
+         "types" : [ "sublocality", "political" ]
+      }
+   ],
+   "status" : "OK"
+}
