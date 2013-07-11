@@ -21,6 +21,10 @@ public abstract class TransactionalJob<R, E> {
 		return repository.find(transaction);
 	}
 
+    public final QueryBuilder<Long> count() {
+        return repository.count(transaction);
+    }
+
 	public final void store(E entity) {
 		repository.store(transaction, entity);
 	}

@@ -23,7 +23,7 @@ public class WundergroundWeatherService extends AbstractServiceClient implements
 	private String hourlyUrl = "http://api.wunderground.com/api/%s/hourly10day/q/%s.json";
 	private String dailyUrl = "http://api.wunderground.com/api/%s/forecast10day/q/%s.json";
 	private final Cache<String, List<WeatherCondition>> cache;
-	private final String apiKey;
+	private String apiKey;
 
 	public WundergroundWeatherService(HttpTransport transport, String apiKey) {
 		super(transport);
@@ -43,6 +43,10 @@ public class WundergroundWeatherService extends AbstractServiceClient implements
 	public void setDailyUrl(String dailyUrl) {
 		this.dailyUrl = dailyUrl;
 	}
+
+    public void setAPIKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
 
 	@Override
 	public List<WeatherCondition> getHourlyForecastFor(final Location location) {

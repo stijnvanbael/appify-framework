@@ -8,4 +8,5 @@ public interface UserRepository<U extends User> {
 
 	void store(U user);
 
+    long count();
 }

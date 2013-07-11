@@ -29,7 +29,12 @@ public class JPATransaction implements Transaction {
 
     @Override
     public <T> QueryBuilder<T> find(Class<T> entityType) {
-        return new JPAQueryBuilder<T>(entityType, entityManager);
+        return JPAQueryBuilder.find(entityType, entityManager);
+    }
+
+    @Override
+    public QueryBuilder<Long> count(Class<?> entityType) {
+        return JPAQueryBuilder.count(entityType, entityManager);
     }
 
     @Override
@@ -57,4 +62,5 @@ public class JPATransaction implements Transaction {
     public boolean isActive() {
         return transaction.isActive();
     }
+
 }

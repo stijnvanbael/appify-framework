@@ -43,9 +43,9 @@ public class AppEngineTransaction implements Transaction {
 			throw new IllegalArgumentException("Missing @Entity annotation on " + object.getClass());
 		}
 		Entity entity = toEntity(object);
-		boolean changed = false;
+		boolean changed;
 		try {
-			CacheKey<Entity> cacheKey = new CacheKey<Entity>(Entity.class, entity.getKey());
+			CacheKey<Entity> cacheKey = new CacheKey<>(Entity.class, entity.getKey());
 			Entity existingEntity = cache.findSingle(cacheKey);
 			if (existingEntity == null) {
 				existingEntity = datastore.get(entity.getKey());
@@ -81,13 +81,13 @@ public class AppEngineTransaction implements Transaction {
 	public void delete(Object object) {
 		Key key = KeyBuilder.createKey(object);
 		LOGGER.debug("[{}] Deleting entity: {}", transaction.getId(), key);
-		cache.evict(new CacheKey<Entity>(Entity.class, key));
+		cache.evict(new CacheKey<>(Entity.class, key));
 		datastore.delete(transaction, key);
 	}
 
 	@Override
 	public <T> QueryBuilder<T> find(Class<T> entityType) {
-		return new AppEngineQueryBuilder<T>(datastore, transaction, cache, entityType);
+		return new AppEngineQueryBuilder<>(datastore, transaction, cache, entityType);
 	}
 
 	private boolean hasEntityAnnotation(Object value) {
@@ -109,7 +109,7 @@ public class AppEngineTransaction implements Transaction {
 	private Entity toEntity(Object object) {
 		Key key = KeyBuilder.createKey(object);
 		Entity entity;
-		Object ancestor = getAncesor(object);
+		Object ancestor = getAncestor(object);
 		if (ancestor != null) {
 			saveInternal(ancestor);
 		}
@@ -137,8 +137,8 @@ public class AppEngineTransaction implements Transaction {
 		return entity;
 	}
 
-	private Object getAncesor(Object object) {
-		Class<? extends Object> type = object.getClass();
+	private Object getAncestor(Object object) {
+		Class<?> type = object.getClass();
 		String name = AppEngineUtil.getAncestorFieldName(type);
 		if (name != null) {
 			try {
@@ -152,12 +152,18 @@ public class AppEngineTransaction implements Transaction {
 	}
 
 	private void cache(Entity entity) {
-		cache.put(new CacheKey<Entity>(Entity.class, entity.getKey()), entity);
+		cache.put(new CacheKey<>(Entity.class, entity.getKey()), entity);
 	}
 
 	@Override
 	public boolean isActive() {
 		return transaction.isActive();
 	}
+
+    @Override
+    public QueryBuilder<Long> count(Class<?> persistentClass) {
+        // TODO
+        return null;
+    }
 
 }

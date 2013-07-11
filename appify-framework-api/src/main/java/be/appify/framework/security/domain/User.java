@@ -106,7 +106,15 @@ public class User extends AbstractEntity {
 			return set("credentials", credentials);
 		}
 
-	}
+        @Override
+        public U build() {
+            U user = super.build();
+            for(Credential<? extends User> credential : user.getCredentials()) {
+                ((Credential<U>) credential).setUser(user);
+            }
+            return user;
+        }
+    }
 
 	public <U extends User, C extends Credential<U>> C getCredential(Class<C> type) {
 		for (Credential<?> credential : credentials) {

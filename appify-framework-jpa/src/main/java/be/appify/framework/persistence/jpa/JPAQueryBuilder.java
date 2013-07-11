@@ -22,12 +22,12 @@ import be.appify.framework.persistence.WhereClauseBuilder;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 
-public class JPAQueryBuilder<T> implements QueryBuilder<T>, QueryConditionBuilder<T>, WhereClauseBuilder<T>, OrderByBuilder<T> {
+public class JPAQueryBuilder<T, R> implements QueryBuilder<T>, QueryConditionBuilder<T>, WhereClauseBuilder<T>, OrderByBuilder<T> {
 
 	private final CriteriaBuilder criteriaBuilder;
 	private final EntityManager entityManager;
-	private final CriteriaQuery<T> query;
-	private final Root<T> root;
+	private CriteriaQuery<T> query;
+	private Root<R> root;
 	private String currentConditionField;
 	private Expression<Boolean> whereClause;
 	private javax.persistence.Query queryToExecute;
@@ -36,16 +36,13 @@ public class JPAQueryBuilder<T> implements QueryBuilder<T>, QueryConditionBuilde
 	private int maxResults;
 	private int firstResult;
 
-	public JPAQueryBuilder(Class<T> entityType, EntityManager entityManager) {
-		this.entityManager = entityManager;
+    public JPAQueryBuilder(EntityManager entityManager) {
+        this.entityManager = entityManager;
 		this.criteriaBuilder = entityManager.getCriteriaBuilder();
-		this.query = criteriaBuilder.createQuery(entityType);
-		this.root = query.from(entityType);
 		this.orderBy = Lists.newArrayList();
-		query.select(root);
-	}
+    }
 
-	@SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked")
 	@Override
 	public T asSingle() {
 		addWhereClause();
@@ -229,4 +226,19 @@ public class JPAQueryBuilder<T> implements QueryBuilder<T>, QueryConditionBuilde
 		return this;
 	}
 
+    public static <T> QueryBuilder<T> find(Class<T> entityType, EntityManager entityManager) {
+        JPAQueryBuilder<T, T> queryBuilder = new JPAQueryBuilder<>(entityManager);
+        queryBuilder.query = queryBuilder.criteriaBuilder.createQuery(entityType);
+        queryBuilder.root = queryBuilder.query.from(entityType);
+        queryBuilder.query.select(queryBuilder.root);
+        return queryBuilder;
+    }
+
+    public static <T> QueryBuilder<Long> count(Class<T> entityType, EntityManager entityManager) {
+        JPAQueryBuilder<Long, T> queryBuilder = new JPAQueryBuilder<>(entityManager);
+        queryBuilder.query = queryBuilder.criteriaBuilder.createQuery(Long.class);
+        queryBuilder.root = queryBuilder.query.from(entityType);
+        queryBuilder.query.select(queryBuilder.criteriaBuilder.count(queryBuilder.root));
+        return queryBuilder;
+    }
 }

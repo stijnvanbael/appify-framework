@@ -15,7 +15,7 @@ public class GoogleLocationService extends AbstractServiceClient implements Loca
 	private String autocompleteUrl = "https://maps.googleapis.com/maps/api/place/autocomplete/json";
 	private String detailsUrl = "https://maps.googleapis.com/maps/api/place/textsearch/json";
 	private final Function<LocationMessage, Location> locationMessageConverter;
-	private final String apiKey;
+	private String apiKey;
 
 	public GoogleLocationService(HttpTransport transport, String apiKey) {
 		super(transport);
@@ -26,6 +26,10 @@ public class GoogleLocationService extends AbstractServiceClient implements Loca
 	public void setAutocompleteUrl(String autocompleteUrl) {
 		this.autocompleteUrl = autocompleteUrl;
 	}
+
+    public void setAPIKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
 
 	public void setDetailsUrl(String detailsUrl) {
 		this.detailsUrl = detailsUrl;

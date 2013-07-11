@@ -35,4 +35,14 @@ public class PersistentUserRepository<U extends User> extends AbstractPersistent
 		});
 	}
 
+    @Override
+    public long count() {
+        return doInTransaction(new TransactionalJob<Long, U>() {
+            @Override
+            public Long execute() {
+                return count().asSingle();
+            }
+        });
+    }
+
 }

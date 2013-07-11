@@ -51,4 +51,8 @@ public abstract class AbstractPersistentRepository<E> {
 
 	protected void entityChanged(E entity) {
 	}
+
+    public QueryBuilder<Long> count(Transaction transaction) {
+        return (QueryBuilder<Long>) transaction.count(persistentClass);
+    }
 }
