@@ -3,7 +3,7 @@
     <parent>
         <groupId>be.appify.framework</groupId>
         <artifactId>appify-framework</artifactId>
-        <version>0.1.8-SNAPSHOT</version>
+        <version>0.1.8-TR10</version>
     </parent>
     <artifactId>appify-framework-test</artifactId>
     <name>Appify Framework Test</name>
