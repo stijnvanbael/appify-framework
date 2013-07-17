@@ -3,7 +3,7 @@
     <parent>
         <artifactId>appify-framework</artifactId>
         <groupId>be.appify.framework</groupId>
-        <version>0.1.8-TR9</version>
+        <version>0.1.8-SNAPSHOT</version>
     </parent>
     <artifactId>appify-framework-wunderground</artifactId>
     <name>Appify Framework Wunderground</name>
