@@ -61,8 +61,8 @@
 	</distributionManagement>
 
 	<scm>
-        <connection>scm:git:ssh://git@github.com/stijnvanbael/appify-framework.git</connection>
-		<developerConnection>scm:git:ssh://git@github.com/stijnvanbael/appify-framework.git</developerConnection>
+        <connection>scm:git:https://github.com/stijnvanbael/appify-framework.git</connection>
+		<developerConnection>scm:git:https://github.com/stijnvanbael/appify-framework.git</developerConnection>
         <url>https://github.com/stijnvanbael/appify-framework</url>
 	</scm>
 </project>
