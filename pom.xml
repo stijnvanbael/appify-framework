@@ -57,5 +57,6 @@
         <connection>scm:git:https://github.com/stijnvanbael/appify-framework.git</connection>
 		<developerConnection>scm:git:https://github.com/stijnvanbael/appify-framework.git</developerConnection>
         <url>https://github.com/stijnvanbael/appify-framework</url>
+        <tag>refs/heads/master</tag>
 	</scm>
 </project>
