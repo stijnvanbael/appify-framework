@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>be.appify.framework</groupId>
     <artifactId>appify-framework</artifactId>
-    <version>0.1.8-SNAPSHOT</version>
+    <version>0.1.8-TR11</version>
     <name>Appify Framework</name>
     <packaging>pom</packaging>
     <modules>
@@ -64,6 +64,6 @@
         <connection>scm:git:https://github.com/stijnvanbael/appify-framework.git</connection>
 		<developerConnection>scm:git:https://github.com/stijnvanbael/appify-framework.git</developerConnection>
         <url>https://github.com/stijnvanbael/appify-framework</url>
-	  <tag>HEAD</tag>
+	  <tag>appify-framework-0.1.8-TR11</tag>
   </scm>
 </project>

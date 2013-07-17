@@ -3,7 +3,7 @@
     <parent>
         <artifactId>appify-framework</artifactId>
         <groupId>be.appify.framework</groupId>
-        <version>0.1.8-SNAPSHOT</version>
+        <version>0.1.8-TR11</version>
         <relativePath>..</relativePath>
     </parent>
     <artifactId>appify-framework-jpa</artifactId>
