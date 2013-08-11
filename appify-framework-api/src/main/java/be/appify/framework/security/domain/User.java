@@ -36,7 +36,7 @@ public class User extends AbstractEntity {
 
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "user", orphanRemoval = true)
 	@ElementCollection(targetClass = Credential.class)
-	private Set<Credential<? extends User>> credentials;
+	private Set<Credential<? extends User>> credentials = Sets.newHashSet();
 
 	public String getFirstName() {
 		return firstName;
