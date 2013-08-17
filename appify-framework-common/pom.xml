@@ -3,7 +3,7 @@
     <parent>
         <groupId>be.appify.framework</groupId>
         <artifactId>appify-framework</artifactId>
-        <version>0.1.8-SNAPSHOT</version>
+        <version>0.1.8</version>
     </parent>
     <properties>
         <google-http-client.version>1.13.1-beta</google-http-client.version>
