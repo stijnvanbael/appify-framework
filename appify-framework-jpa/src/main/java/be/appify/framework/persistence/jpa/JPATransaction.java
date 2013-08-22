@@ -45,8 +45,11 @@ public class JPATransaction implements Transaction {
 
     @Override
     public void commit() {
-        transaction.commit();
-        entityManagerPool.returnEntityManager(entityManager);
+        try {
+            transaction.commit();
+        } finally {
+            entityManagerPool.returnEntityManager(entityManager);
+        }
     }
 
     @Override
