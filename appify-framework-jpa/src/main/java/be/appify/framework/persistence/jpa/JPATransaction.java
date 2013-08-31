@@ -38,6 +38,11 @@ public class JPATransaction implements Transaction {
     }
 
     @Override
+    public int execute(String nativeCommand) {
+        return JPAQueryBuilder.execute(nativeCommand, entityManager);
+    }
+
+    @Override
     public void delete(Object entity) {
         entity = entityManager.merge(entity);
         entityManager.remove(entity);

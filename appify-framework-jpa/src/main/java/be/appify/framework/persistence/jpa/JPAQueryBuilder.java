@@ -279,4 +279,8 @@ public class JPAQueryBuilder<T, R> implements QueryBuilder<T>, QueryConditionBui
             }
         });
     }
+
+    public static int execute(String nativeCommand, EntityManager entityManager) {
+        return entityManager.createNativeQuery(nativeCommand).executeUpdate();
+    }
 }

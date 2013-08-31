@@ -14,4 +14,6 @@ public interface Transaction {
 	boolean isActive();
 
     QueryBuilder<Long> count(Class<?> persistentClass);
+
+    int execute(String nativeCommand);
 }

@@ -166,4 +166,9 @@ public class AppEngineTransaction implements Transaction {
         return null;
     }
 
+    @Override
+    public int execute(String nativeCommand) {
+        return 0;
+    }
+
 }
