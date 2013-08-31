@@ -26,7 +26,9 @@ public class JPAQueryBuilder<T, R> implements QueryBuilder<T>, QueryConditionBui
 
 	private final CriteriaBuilder criteriaBuilder;
 	private final EntityManager entityManager;
-	private CriteriaQuery<T> query;
+    private final Function<Object, CriteriaQuery<T>> criteriaQueryFactory;
+    private final Function<CriteriaQuery<T>, Root<R>> rootFactory;
+    private CriteriaQuery<T> query;
 	private Root<R> root;
 	private String currentConditionField;
 	private Expression<Boolean> whereClause;
@@ -36,9 +38,11 @@ public class JPAQueryBuilder<T, R> implements QueryBuilder<T>, QueryConditionBui
 	private int maxResults;
 	private int firstResult;
 
-    public JPAQueryBuilder(EntityManager entityManager) {
+    public JPAQueryBuilder(EntityManager entityManager, Function<Object, CriteriaQuery<T>> criteriaQueryFactory, Function<CriteriaQuery<T>, Root<R>> rootFactory) {
         this.entityManager = entityManager;
-		this.criteriaBuilder = entityManager.getCriteriaBuilder();
+        this.criteriaQueryFactory = criteriaQueryFactory;
+        this.rootFactory = rootFactory;
+        this.criteriaBuilder = entityManager.getCriteriaBuilder();
 		this.orderBy = Lists.newArrayList();
     }
 
@@ -62,13 +66,22 @@ public class JPAQueryBuilder<T, R> implements QueryBuilder<T>, QueryConditionBui
 
 	private void initializeQuery() {
 		if (queryToExecute == null) {
-			queryToExecute = entityManager.createQuery(query);
+            CriteriaQuery<T> q = query();
+            root();
+            queryToExecute = entityManager.createQuery(q);
 		}
 	}
 
-	private void addWhereClause() {
+    private CriteriaQuery<T> query() {
+        if(query == null) {
+            query = criteriaQueryFactory.apply(null);
+        }
+        return query;
+    }
+
+    private void addWhereClause() {
 		if (whereClause != null) {
-			query.where(whereClause);
+			query().where(whereClause);
 		}
 	}
 
@@ -98,17 +111,24 @@ public class JPAQueryBuilder<T, R> implements QueryBuilder<T>, QueryConditionBui
 
 	private void addOrderByClause() {
 		if (!orderBy.isEmpty()) {
-			query.orderBy(orderBy);
+			query().orderBy(orderBy);
 		}
 	}
 
 	@Override
 	public OrderByBuilder<T> orderBy(String name) {
-		orderBy.add(criteriaBuilder.asc(getPath(root, name)));
+		orderBy.add(criteriaBuilder.asc(getPath(root(), name)));
 		return this;
 	}
 
-	@Override
+    private Root<R> root() {
+        if(root == null) {
+            root = rootFactory.apply(query());
+        }
+        return root;
+    }
+
+    @Override
 	public QueryConditionBuilder<T> where(String field) {
 		this.currentConditionField = field;
 		return this;
@@ -143,7 +163,7 @@ public class JPAQueryBuilder<T, R> implements QueryBuilder<T>, QueryConditionBui
 	}
 
 	private <P> Expression<P> getCurrentPath() {
-		return getPath(root, currentConditionField);
+		return getPath(root(), currentConditionField);
 	}
 
 	private <P> Path<P> getPath(Path<?> parent, String property) {
@@ -226,19 +246,37 @@ public class JPAQueryBuilder<T, R> implements QueryBuilder<T>, QueryConditionBui
 		return this;
 	}
 
-    public static <T> QueryBuilder<T> find(Class<T> entityType, EntityManager entityManager) {
-        JPAQueryBuilder<T, T> queryBuilder = new JPAQueryBuilder<>(entityManager);
-        queryBuilder.query = queryBuilder.criteriaBuilder.createQuery(entityType);
-        queryBuilder.root = queryBuilder.query.from(entityType);
-        queryBuilder.query.select(queryBuilder.root);
-        return queryBuilder;
+    public static <T> QueryBuilder<T> find(final Class<T> entityType, final EntityManager entityManager) {
+        final CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        return new JPAQueryBuilder<>(entityManager, new Function<Object, CriteriaQuery<T>>() {
+            @Override
+            public CriteriaQuery<T> apply(Object input) {
+                return criteriaBuilder.createQuery(entityType);
+            }
+        }, new Function<CriteriaQuery<T>, Root<T>>() {
+            @Override
+            public Root<T> apply(CriteriaQuery<T> query) {
+                Root<T> root = query.from(entityType);
+                query.select(root);
+                return root;
+            }
+        });
     }
 
-    public static <T> QueryBuilder<Long> count(Class<T> entityType, EntityManager entityManager) {
-        JPAQueryBuilder<Long, T> queryBuilder = new JPAQueryBuilder<>(entityManager);
-        queryBuilder.query = queryBuilder.criteriaBuilder.createQuery(Long.class);
-        queryBuilder.root = queryBuilder.query.from(entityType);
-        queryBuilder.query.select(queryBuilder.criteriaBuilder.count(queryBuilder.root));
-        return queryBuilder;
+    public static <T> QueryBuilder<Long> count(final Class<T> entityType, final EntityManager entityManager) {
+        final CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        return new JPAQueryBuilder<>(entityManager, new Function<Object, CriteriaQuery<Long>>() {
+            @Override
+            public CriteriaQuery<Long> apply(Object input) {
+                return criteriaBuilder.createQuery(Long.class);
+            }
+        }, new Function<CriteriaQuery<Long>, Root<T>>() {
+            @Override
+            public Root<T> apply(CriteriaQuery<Long> query) {
+                Root<T> root = query.from(entityType);
+                query.select(criteriaBuilder.count(root));
+                return root;
+            }
+        });
     }
 }

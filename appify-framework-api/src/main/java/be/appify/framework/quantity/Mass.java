@@ -33,6 +33,10 @@ public class Mass {
         return kilograms * 1000;
     }
 
+    public Mass multiply(double multiplier) {
+        return new Mass(kilograms * multiplier);
+    }
+
     @Override
     public String toString() {
         if (kilograms < 1) {
@@ -53,8 +57,8 @@ public class Mass {
         return Objects.equal((long) (this.kilograms * 10000), (long) (other.kilograms * 10000));
     }
 
-    public Mass add(Mass distance) {
-        return new Mass(this.kilograms + distance.kilograms);
+    public Mass add(Mass mass) {
+        return new Mass(this.kilograms + mass.kilograms);
     }
 
     public int compareTo(Mass other) {

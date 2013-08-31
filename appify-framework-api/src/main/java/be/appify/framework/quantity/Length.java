@@ -33,6 +33,10 @@ public class Length {
 		return meters * 1000;
 	}
 
+    public Length multiply(double multiplier) {
+        return new Length(meters * multiplier);
+    }
+
 	@Override
 	public String toString() {
 		if (meters < 1) {
