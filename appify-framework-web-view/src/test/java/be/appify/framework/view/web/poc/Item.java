@@ -1,23 +1,15 @@
 package be.appify.framework.view.web.poc;
 
-import be.appify.framework.functional.BinaryProcedure;
-import be.appify.framework.functional.RepeatableProcedure;
-import be.appify.framework.view.web.functional.RunAtLeastOnceProcedure;
+import be.appify.framework.view.web.annotation.Parameter;
 import be.appify.framework.view.web.annotation.Context;
 
 import javax.imageio.ImageIO;
+import javax.validation.constraints.Min;
 import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 
 public class Item {
-    private static final BinaryProcedure<Cart, Item> ADD_TO_CART = new BinaryProcedure<Cart, Item>() {
-        @Override
-        public void run(Cart cart, Item item) {
-            cart.add(item);
-        }
-    };
-
     private final String name;
     private final Image image;
 
@@ -50,12 +42,20 @@ public class Item {
         return image;
     }
 
-    public RepeatableProcedure addToCart(@Context final Cart cart) {
-        return new RunAtLeastOnceProcedure() {
-            @Override
-            public void run() {
-                ADD_TO_CART.run(cart, Item.this);
-            }
-        };
+    public AddToCartAction addToCart(@Context final Cart cart) {
+        Cart.Order order = cart.add(this);
+        return new AddToCartAction(order);
+    }
+
+    public class AddToCartAction {
+        private final Cart.Order order;
+
+        public AddToCartAction(Cart.Order order) {
+            this.order = order;
+        }
+
+        public void times(@Parameter(defaultValue = "1") @Min(1) int quantity) {
+            order.quantity(quantity);
+        }
     }
 }

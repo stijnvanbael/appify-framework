@@ -14,9 +14,10 @@ public class CommerceTest {
         LEGO_MINECRAFT.addToCart(cart);
         BABY_MANUAL.addToCart(cart).times(2);
 
-        Assert.assertThat(cart.items().size(), CoreMatchers.equalTo(3));
-        Assert.assertThat(cart.items().get(0), CoreMatchers.equalTo(LEGO_MINECRAFT));
-        Assert.assertThat(cart.items().get(1), CoreMatchers.equalTo(BABY_MANUAL));
-        Assert.assertThat(cart.items().get(2), CoreMatchers.equalTo(BABY_MANUAL));
+        Assert.assertThat(cart.items().size(), CoreMatchers.equalTo(2));
+        Assert.assertThat(cart.items().get(0).item(), CoreMatchers.equalTo(LEGO_MINECRAFT));
+        Assert.assertThat(cart.items().get(0).quantity(), CoreMatchers.equalTo(1));
+        Assert.assertThat(cart.items().get(1).item(), CoreMatchers.equalTo(BABY_MANUAL));
+        Assert.assertThat(cart.items().get(1).quantity(), CoreMatchers.equalTo(2));
     }
 }
