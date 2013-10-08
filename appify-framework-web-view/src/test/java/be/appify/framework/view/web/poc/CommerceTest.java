@@ -4,7 +4,7 @@ import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class ShopTest {
+public class CommerceTest {
     private static final Item LEGO_MINECRAFT = new Item("Lego Minecraft Microworld", "lego-minecraft.jpg");
     private static final Item BABY_MANUAL = new Item("The Baby Owner's Manual", "baby-manual.jpg");
 

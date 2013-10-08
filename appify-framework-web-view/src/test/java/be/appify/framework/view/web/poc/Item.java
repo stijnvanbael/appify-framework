@@ -2,7 +2,8 @@ package be.appify.framework.view.web.poc;
 
 import be.appify.framework.functional.BinaryProcedure;
 import be.appify.framework.functional.RepeatableProcedure;
-import be.appify.framework.functional.RunAtLeastOnceRepeatableProcedure;
+import be.appify.framework.view.web.functional.RunAtLeastOnceProcedure;
+import be.appify.framework.view.web.annotation.Context;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -49,8 +50,8 @@ public class Item {
         return image;
     }
 
-    public RepeatableProcedure addToCart(final Cart cart) {
-        return new RunAtLeastOnceRepeatableProcedure() {
+    public RepeatableProcedure addToCart(@Context final Cart cart) {
+        return new RunAtLeastOnceProcedure() {
             @Override
             public void run() {
                 ADD_TO_CART.run(cart, Item.this);
