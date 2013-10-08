@@ -14,6 +14,7 @@
         <module>appify-framework-common</module>
         <module>appify-framework-test</module>
         <module>appify-framework-wunderground</module>
+        <module>appify-framework-web-view</module>
     </modules>
     <properties>
         <gae.version>1.7.2</gae.version>
