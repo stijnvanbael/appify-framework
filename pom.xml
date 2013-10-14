@@ -15,6 +15,7 @@
         <module>appify-framework-test</module>
         <module>appify-framework-wunderground</module>
         <module>appify-framework-web-view</module>
+        <module>appify-framework-logging</module>
     </modules>
     <properties>
         <gae.version>1.7.2</gae.version>
