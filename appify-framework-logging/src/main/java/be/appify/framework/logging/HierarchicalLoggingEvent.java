@@ -4,14 +4,17 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.classic.spi.LoggerContextVO;
+import com.google.common.collect.Lists;
 import org.slf4j.Marker;
 
+import java.util.List;
 import java.util.Map;
 
 public class HierarchicalLoggingEvent implements ILoggingEvent {
     private ILoggingEvent event;
     private StackHierarchy hierarchy;
     private HierarchicalLoggingEvent parent;
+    private List<HierarchicalLoggingEvent> children = Lists.newArrayList();
 
     public HierarchicalLoggingEvent(ILoggingEvent event) {
         this.event = event;
@@ -40,25 +43,23 @@ public class HierarchicalLoggingEvent implements ILoggingEvent {
     @Override
     public String getFormattedMessage() {
         StringBuilder builder = new StringBuilder();
-        for(int i = 0; i < hierarchy.getLevel() - 1; i++) {
-            builder.append("| ");
+        for(int i = 0; i < hierarchy.getLevel(); i++) {
+            builder.append(" | ");
         }
-        if(hierarchy.getLevel() > 0) {
-            builder.append(levelChar());
-            builder.append(" ");
-        }
-        builder.append(event.getFormattedMessage());
+        builder.append(levelString())
+            .append(" ")
+            .append(event.getFormattedMessage());
         return builder.toString();
     }
 
-    private char levelChar() {
+    private String levelString() {
         switch (getLevel().toInt()) {
             case Level.ERROR_INT:
-                return 'X';
+                return "<X>";
             case Level.WARN_INT:
-                return '!';
+                return "<!>";
         }
-        return 'O';
+        return "(.)";
     }
 
     @Override
@@ -125,5 +126,15 @@ public class HierarchicalLoggingEvent implements ILoggingEvent {
 
     public HierarchicalLoggingEvent getParent() {
         return parent;
+    }
+
+    public void addChild(HierarchicalLoggingEvent event) {
+        event.setParent(this);
+        children.add(event);
+    }
+
+    @Override
+    public String toString() {
+        return getFormattedMessage();
     }
 }

@@ -29,7 +29,7 @@ public class ThreadHistory {
         while(!eventStack.isEmpty()) {
             HierarchicalLoggingEvent e = eventStack.peek();
             if(e.getHierarchy().isParentOf(hierarchy)) {
-                event.setParent(e);
+                e.addChild(event);
                 break;
             }
             eventStack.pop();
