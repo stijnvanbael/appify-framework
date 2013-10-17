@@ -10,9 +10,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 
 public class HierarchicalAppenderDecorator extends DecoratingAppender {
-    private Map<String, ThreadHistory> threads = Maps.newHashMap();
+    private Map<String, ThreadHistory> threads = Maps.newConcurrentMap();
     private Level threshold = Level.WARN;
-    private Queue<HierarchicalLoggingEvent> eventQueue = new ConcurrentLinkedQueue<>();
     private CountDownLatch eventsAvailable = new CountDownLatch(1);
     private CountDownLatch flushed;
 
@@ -21,42 +20,24 @@ public class HierarchicalAppenderDecorator extends DecoratingAppender {
             @Override
             public void run() {
                 while(!Thread.currentThread().isInterrupted()) {
-                    boolean empty;
-                    synchronized (HierarchicalAppenderDecorator.this) {
-                        empty = eventQueue.isEmpty();
-                    }
-                    if(empty) {
+                    boolean done;
+                    done = threads.isEmpty();
+                    if(done) {
                         try {
                             eventsAvailable.await();
                         } catch (InterruptedException e) {
                             break;
                         }
                     }
-                    while(!empty) {
-                        HierarchicalLoggingEvent event;
-                        synchronized (HierarchicalAppenderDecorator.this) {
-                            event = eventQueue.peek();
-                        }
-                        try {
-                            String threadName = event.getThreadName();
-                            ThreadHistory history = threads.get(threadName);
-                            if(history == null) {
-                                history = new ThreadHistory(threadName);
-                                threads.put(threadName, history);
+                    while(!done) {
+                        if(!writeEvents()) {
+                            try {
+                                Thread.sleep(100);
+                            } catch (InterruptedException e) {
+                                break;
                             }
-                            history.addEvent(event);
-                            if(history.getMaxLevel().isGreaterOrEqual(threshold)) {
-                                for(ILoggingEvent e : history.popUnloggedEvents()) {
-                                    decoratedAppender.doAppend(e);
-                                }
-                            }
-                        } catch(Throwable t) {
-                            addError(t.getMessage(), t);
-                        }
-                        synchronized (HierarchicalAppenderDecorator.this) {
-                            eventQueue.remove();
-                            empty = eventQueue.isEmpty();
-                            if(empty) {
+                            if(!writeEvents()) {
+                                done = true;
                                 if(flushed != null) {
                                     flushed.countDown();
                                 }
@@ -70,9 +51,33 @@ public class HierarchicalAppenderDecorator extends DecoratingAppender {
 
     }
 
+    private boolean writeEvents() {
+        boolean written = false;
+        for(ThreadHistory history : threads.values()) {
+            if(history.getMaxLevel().isGreaterOrEqual(threshold)) {
+                for(ILoggingEvent e : history.popUnloggedEvents()) {
+                    decoratedAppender.doAppend(e);
+                }
+                written = true;
+            }
+            synchronized (this) {
+                if(history.isEmpty()) {
+                    threads.remove(history.getThreadName());
+                }
+            }
+        }
+        return written;
+    }
+
     @Override
     protected synchronized void append(ILoggingEvent event) {
-        eventQueue.offer(new HierarchicalLoggingEvent(event));
+        String threadName = event.getThreadName();
+        ThreadHistory history = threads.get(threadName);
+        if(history == null) {
+            history = new ThreadHistory(threadName, threshold);
+            threads.put(threadName, history);
+        }
+        history.addEvent(new HierarchicalLoggingEvent(event));
         eventsAvailable.countDown();
     }
 
@@ -82,7 +87,7 @@ public class HierarchicalAppenderDecorator extends DecoratingAppender {
 
     public void flush() {
         synchronized (this) {
-            if(eventQueue.isEmpty()) {
+            if(threads.isEmpty()) {
                 return;
             }
             flushed = new CountDownLatch(1);

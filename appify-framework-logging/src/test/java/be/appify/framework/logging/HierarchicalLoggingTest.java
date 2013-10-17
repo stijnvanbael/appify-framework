@@ -16,7 +16,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-// TODO: prevent other threads from cutting through a tree
 public class HierarchicalLoggingTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(HierarchicalLoggingTest.class);
     private Appender<ILoggingEvent> consoleAppender;
@@ -67,6 +66,7 @@ public class HierarchicalLoggingTest {
         LOGGER.debug("Top level (2)");
 
 
+        Thread.sleep(1000);
         hierarchicalAppender.flush();
         verify(consoleAppender, times(10)).doAppend(log("<X> Other thread"));
         verify(consoleAppender).doAppend(log("(.) Top level (1)"));
