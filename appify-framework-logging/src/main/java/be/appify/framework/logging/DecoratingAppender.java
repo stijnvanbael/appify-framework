@@ -66,4 +66,5 @@ public abstract class DecoratingAppender extends AppenderBase<ILoggingEvent> imp
     public boolean detachAppender(String name) {
         throw new UnsupportedOperationException(NOT_IMPLEMENTED_EXPLANATION);
     }
+
 }

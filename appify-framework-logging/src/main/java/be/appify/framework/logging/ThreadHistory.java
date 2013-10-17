@@ -1,20 +1,16 @@
 package be.appify.framework.logging;
 
 import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.CallerData;
 import com.google.common.collect.Lists;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Stack;
 
 public class ThreadHistory {
 
     private String threadName;
-    private StackHierarchy hierarchy;
+    private CallStack callStack;
     private List<HierarchicalLoggingEvent> unloggedEvents = Lists.newArrayList();
-    private Stack<HierarchicalLoggingEvent> eventStack = new Stack<>();
+    private java.util.Stack<HierarchicalLoggingEvent> eventStack = new java.util.Stack();
     private Level maxLevel;
 
     public ThreadHistory(String threadName) {
@@ -22,20 +18,17 @@ public class ThreadHistory {
     }
 
     public void addEvent(HierarchicalLoggingEvent event) {
-        StackTraceElement[] stack = CallerData.extract(new Throwable(), Logger.FQCN,
-                Integer.MAX_VALUE, Collections.<String>emptyList());
-        hierarchy = new StackHierarchy(stack, hierarchy);
-        event.setHierarchy(hierarchy);
+        callStack = event.getCallStack();
         while(!eventStack.isEmpty()) {
             HierarchicalLoggingEvent e = eventStack.peek();
-            if(e.getHierarchy().isParentOf(hierarchy)) {
+            if(e.getCallStack().isParentOf(callStack)) {
                 e.addChild(event);
                 break;
             }
             eventStack.pop();
         }
         eventStack.push(event);
-        if(hierarchy.getLevel() == 0) {
+        if(event.getHierarchyLevel() == 0) {
             popUnloggedEvents();
             maxLevel = Level.ALL;
         }
@@ -49,8 +42,8 @@ public class ThreadHistory {
         return threadName;
     }
 
-    public StackHierarchy getHierarchy() {
-        return hierarchy;
+    public CallStack getCallStack() {
+        return callStack;
     }
 
     public List<HierarchicalLoggingEvent> popUnloggedEvents() {

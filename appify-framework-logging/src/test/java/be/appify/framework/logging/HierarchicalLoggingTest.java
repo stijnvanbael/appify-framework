@@ -10,47 +10,65 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.CountDownLatch;
+
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-// TODO: log async
 // TODO: prevent other threads from cutting through a tree
 public class HierarchicalLoggingTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(HierarchicalLoggingTest.class);
     private Appender<ILoggingEvent> consoleAppender;
+    private HierarchicalAppenderDecorator hierarchicalAppender;
+    private CountDownLatch otherThread1 = new CountDownLatch(1);
+    private CountDownLatch otherThread2 = new CountDownLatch(1);
+    private CountDownLatch mainThread1 = new CountDownLatch(1);
 
     @Before
     public void before() {
         ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
-        HierarchicalAppenderDecorator hierarchicalAppender = (HierarchicalAppenderDecorator) root.getAppender("STDOUT");
+        hierarchicalAppender = (HierarchicalAppenderDecorator) root.getAppender("STDOUT");
         consoleAppender = Mockito.spy(hierarchicalAppender.getDecoratedAppender());
         hierarchicalAppender.setDecoratedAppender(consoleAppender);
     }
 
     @Test
-    public void shouldLogHierarchy() {
+    public void shouldLogHierarchy() throws InterruptedException {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                LOGGER.debug("Other thread (1)");
-                LOGGER.error("Other thread (2)");
-                LOGGER.error("Other thread (2)");
-                LOGGER.error("Other thread (2)");
-                LOGGER.error("Other thread (2)");
-                LOGGER.error("Other thread (2)");
-                LOGGER.error("Other thread (2)");
-                LOGGER.error("Other thread (2)");
-                LOGGER.error("Other thread (2)");
-                LOGGER.error("Other thread (2)");
+                LOGGER.error("Other thread");
+                LOGGER.error("Other thread");
+                LOGGER.error("Other thread");
+                LOGGER.error("Other thread");
+                LOGGER.error("Other thread");
+                otherThread1.countDown();
+                try {
+                    mainThread1.await();
+                } catch (InterruptedException e) {
+                }
+                LOGGER.error("Other thread");
+                LOGGER.error("Other thread");
+                LOGGER.error("Other thread");
+                LOGGER.error("Other thread");
+                LOGGER.error("Other thread");
+                otherThread2.countDown();
             }
         }, "other-thread").start();
+
+        otherThread1.await();
         LOGGER.debug("Top level (1)");
         sublevel1(1);
+        mainThread1.countDown();
+        otherThread2.await();
         sublevel1(2);
         sublevel1NoWarn(3);
         LOGGER.debug("Top level (2)");
-        verify(consoleAppender).doAppend(log("<X> Other thread (2)"));
+
+
+        hierarchicalAppender.flush();
+        verify(consoleAppender, times(10)).doAppend(log("<X> Other thread"));
         verify(consoleAppender).doAppend(log("(.) Top level (1)"));
         verify(consoleAppender).doAppend(log(" | (.) Sublevel 1 (1)"));
         verify(consoleAppender, times(3)).doAppend(log(" |  | (.) Sublevel 2 (1)"));

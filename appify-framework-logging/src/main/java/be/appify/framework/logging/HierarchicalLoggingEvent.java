@@ -1,23 +1,32 @@
 package be.appify.framework.logging;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.CallerData;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.classic.spi.LoggerContextVO;
 import com.google.common.collect.Lists;
 import org.slf4j.Marker;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 public class HierarchicalLoggingEvent implements ILoggingEvent {
     private ILoggingEvent event;
-    private StackHierarchy hierarchy;
+    private CallStack callStack;
     private HierarchicalLoggingEvent parent;
     private List<HierarchicalLoggingEvent> children = Lists.newArrayList();
 
     public HierarchicalLoggingEvent(ILoggingEvent event) {
         this.event = event;
+
+        // Initialize thread name on the correct thread
+        event.getThreadName();
+
+        StackTraceElement[] stack = CallerData.extract(new Throwable(), Logger.FQCN, Integer.MAX_VALUE, Collections.<String>emptyList());
+        callStack = new CallStack(stack);
     }
 
     @Override
@@ -43,7 +52,7 @@ public class HierarchicalLoggingEvent implements ILoggingEvent {
     @Override
     public String getFormattedMessage() {
         StringBuilder builder = new StringBuilder();
-        for(int i = 0; i < hierarchy.getLevel(); i++) {
+        for(int i = 0; i < getHierarchyLevel(); i++) {
             builder.append(" | ");
         }
         builder.append(levelString())
@@ -112,12 +121,8 @@ public class HierarchicalLoggingEvent implements ILoggingEvent {
         event.prepareForDeferredProcessing();
     }
 
-    public StackHierarchy getHierarchy() {
-        return hierarchy;
-    }
-
-    public void setHierarchy(StackHierarchy hierarchy) {
-        this.hierarchy = hierarchy;
+    public CallStack getCallStack() {
+        return callStack;
     }
 
     public void setParent(HierarchicalLoggingEvent parent) {
@@ -136,5 +141,9 @@ public class HierarchicalLoggingEvent implements ILoggingEvent {
     @Override
     public String toString() {
         return getFormattedMessage();
+    }
+
+    public int getHierarchyLevel() {
+        return parent != null ? parent.getHierarchyLevel() + 1 : 0;
     }
 }
