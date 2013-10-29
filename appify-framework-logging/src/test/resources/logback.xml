@@ -11,8 +11,11 @@
         <appender-ref ref="CONSOLE" />
     </appender>
 
+    <appender name="PERSISTENCE" class="be.appify.framework.logging.PersistenceAppender"/>
+
 
     <root level="debug">
         <appender-ref ref="STDOUT" />
+        <appender-ref ref="PERSISTENCE" />
     </root>
 </configuration>
