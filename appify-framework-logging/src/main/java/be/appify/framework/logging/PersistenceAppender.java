@@ -4,6 +4,8 @@ import be.appify.framework.persistence.Persistence;
 import be.appify.framework.persistence.Transaction;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.IThrowableProxy;
+import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import ch.qos.logback.core.AppenderBase;
 
 import java.util.Date;
@@ -28,16 +30,62 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         int lineNumber = element.getLineNumber();
         String threadName = eventObject.getThreadName();
         Date timestamp = new Date(eventObject.getTimeStamp());
-        eventObject.getThrowableProxy();
+        IThrowableProxy throwableProxy = eventObject.getThrowableProxy();
+        String fileName = element.getFileName();
+        String stackTrace = buildStackTrace(throwableProxy);
         return new Event.Builder()
                 .message(message)
                 .level(level)
                 .className(className)
+                .fileName(fileName)
                 .methodName(methodName)
                 .lineNumber(lineNumber)
                 .threadName(threadName)
                 .timestamp(timestamp)
+                .stackTrace(stackTrace)
                 .build();
+    }
+
+    private String buildStackTrace(IThrowableProxy throwableProxy) {
+        if(throwableProxy == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        appendStackTrace(throwableProxy, sb, new StackTraceElementProxy[0]);
+        return sb.toString();
+    }
+
+    private void appendStackTrace(IThrowableProxy throwableProxy, StringBuilder sb, StackTraceElementProxy[] parentStackTrace) {
+        sb.append(throwableProxy.getClassName())
+                .append(": ")
+                .append(throwableProxy.getMessage())
+                .append("\n");
+        int parentIndex = 0;
+        for(StackTraceElementProxy stackTraceElement : throwableProxy.getStackTraceElementProxyArray()) {
+            if(parentStackTrace.length > parentIndex && stackTraceElement.equals(parentStackTrace[parentIndex])) {
+                parentIndex++;
+            } else {
+                StackTraceElement element = stackTraceElement.getStackTraceElement();
+                sb.append("    at ")
+                        .append(element.getClassName())
+                        .append(".")
+                        .append(element.getMethodName())
+                        .append("(")
+                        .append(element.getFileName())
+                        .append(":")
+                        .append(element.getLineNumber())
+                        .append(")\n");
+            }
+        }
+        if(parentIndex > 0) {
+            sb.append("    ... ")
+                    .append(parentIndex)
+                    .append(" more\n");
+        }
+        if(throwableProxy.getCause() != null) {
+            sb.append("Caused by: ");
+            appendStackTrace(throwableProxy.getCause(), sb, throwableProxy.getStackTraceElementProxyArray());
+        }
     }
 
     private Event.Level translate(Level level) {
