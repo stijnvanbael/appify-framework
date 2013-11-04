@@ -6,19 +6,50 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
+import ch.qos.logback.core.Appender;
 import ch.qos.logback.core.AppenderBase;
+import ch.qos.logback.core.ConsoleAppender;
 
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
-    private Persistence persistence;
+    private Appender<ILoggingEvent> fallbackAppender;
+    private ConsoleAppender<ILoggingEvent> systemErrorAppender = new ConsoleAppender<>();
+    private AtomicBoolean fallbackReported = new AtomicBoolean(false);
+
+    public PersistenceAppender() {
+        systemErrorAppender.setTarget("System.err");
+    }
 
     @Override
     protected void append(ILoggingEvent eventObject) {
-        Transaction transaction = persistence.beginTransaction();
-        Event event = createEvent(eventObject);
-        transaction.save(event);
-        transaction.commit();
+        Persistence persistence = PersistenceProvider.getPersistence();
+        if (persistence != null) {
+            Transaction transaction = persistence.beginTransaction();
+            Event event = createEvent(eventObject);
+            transaction.save(event);
+            transaction.commit();
+        } else {
+            if(!fallbackReported.compareAndSet(true, true)) {
+                reportFallback();
+            }
+            if(fallbackAppender != null) {
+                fallbackAppender.doAppend(eventObject);
+            } else {
+                systemErrorAppender.doAppend(eventObject);
+            }
+        }
+    }
+
+    private void reportFallback() {
+        if(fallbackAppender != null) {
+            fallbackAppender.addWarn("Persistence not set for appender " + getName() + ", falling back to " + fallbackAppender.getName() + ".");
+        } else {
+            systemErrorAppender.addWarn("Persistence not set for appender " + getName() + " and no fallback appender is defined, falling back to System.err.");
+        }
     }
 
     private Event createEvent(ILoggingEvent eventObject) {
@@ -47,7 +78,7 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
     }
 
     private String buildStackTrace(IThrowableProxy throwableProxy) {
-        if(throwableProxy == null) {
+        if (throwableProxy == null) {
             return null;
         }
         StringBuilder sb = new StringBuilder();
@@ -61,8 +92,8 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
                 .append(throwableProxy.getMessage())
                 .append("\n");
         int parentIndex = 0;
-        for(StackTraceElementProxy stackTraceElement : throwableProxy.getStackTraceElementProxyArray()) {
-            if(parentStackTrace.length > parentIndex && stackTraceElement.equals(parentStackTrace[parentIndex])) {
+        for (StackTraceElementProxy stackTraceElement : throwableProxy.getStackTraceElementProxyArray()) {
+            if (parentStackTrace.length > parentIndex && stackTraceElement.equals(parentStackTrace[parentIndex])) {
                 parentIndex++;
             } else {
                 StackTraceElement element = stackTraceElement.getStackTraceElement();
@@ -77,12 +108,12 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
                         .append(")\n");
             }
         }
-        if(parentIndex > 0) {
+        if (parentIndex > 0) {
             sb.append("    ... ")
                     .append(parentIndex)
                     .append(" more\n");
         }
-        if(throwableProxy.getCause() != null) {
+        if (throwableProxy.getCause() != null) {
             sb.append("Caused by: ");
             appendStackTrace(throwableProxy.getCause(), sb, throwableProxy.getStackTraceElementProxyArray());
         }
@@ -102,8 +133,22 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         return Event.Level.TRACE;
     }
 
-    public void setPersistence(Persistence persistence) {
-        this.persistence = persistence;
+    public void setFallbackAppender(Appender<ILoggingEvent> fallbackAppender) {
+        this.fallbackAppender = fallbackAppender;
+    }
+
+    @ApplicationScoped
+    public static final class PersistenceProvider {
+        private static Persistence persistence;
+
+        @Inject
+        public PersistenceProvider(Persistence persistence) {
+            PersistenceProvider.persistence = persistence;
+        }
+
+        static Persistence getPersistence() {
+            return persistence;
+        }
     }
 
 }

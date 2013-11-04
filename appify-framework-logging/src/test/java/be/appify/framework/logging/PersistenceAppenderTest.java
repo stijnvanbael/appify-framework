@@ -17,6 +17,7 @@ import java.util.Date;
 
 import static org.mockito.Mockito.times;
 
+// TODO: log hierarchical events
 @RunWith(MockitoJUnitRunner.class)
 public class PersistenceAppenderTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(PersistenceAppenderTest.class);
@@ -40,8 +41,8 @@ public class PersistenceAppenderTest {
     @Before
     public void before() {
         ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+        new PersistenceAppender.PersistenceProvider(persistence);
         persistenceAppender = (PersistenceAppender) root.getAppender("PERSISTENCE");
-        persistenceAppender.setPersistence(persistence);
 
         Mockito.when(persistence.beginTransaction()).thenReturn(transaction);
     }
