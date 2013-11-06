@@ -16,8 +16,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-public class HierarchicalLoggingTest {
-    private static final Logger LOGGER = LoggerFactory.getLogger(HierarchicalLoggingTest.class);
+public class HierarchicalAppenderTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(HierarchicalAppenderTest.class);
     private Appender<ILoggingEvent> consoleAppender;
     private HierarchicalAppenderDecorator hierarchicalAppender;
     private CountDownLatch otherThread1 = new CountDownLatch(1);
@@ -27,7 +27,7 @@ public class HierarchicalLoggingTest {
     @Before
     public void before() {
         ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
-        hierarchicalAppender = (HierarchicalAppenderDecorator) root.getAppender("STDOUT");
+        hierarchicalAppender = (HierarchicalAppenderDecorator) root.getAppender("CONSOLE_HIERARCHICAL");
         consoleAppender = Mockito.spy(hierarchicalAppender.getDecoratedAppender());
         hierarchicalAppender.setDecoratedAppender(consoleAppender);
     }

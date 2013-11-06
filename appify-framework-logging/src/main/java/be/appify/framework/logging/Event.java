@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.Objects;
 
 public class Event {
+    private String id;
     private String message;
     private Level level;
     private String className;
@@ -13,9 +14,10 @@ public class Event {
     private String threadName;
     private final Date timestamp;
     private String stackTrace;
+    private Event parent;
 
-    private Event(String message, Level level, String className, String fileName, String methodName, int lineNumber, String threadName,
-                 Date timestamp, String stackTrace) {
+    private Event(String id, String message, Level level, String className, String fileName, String methodName, int lineNumber, String threadName,
+                  Date timestamp, String stackTrace, Event parent) {
         this.message = message;
         this.level = level;
         this.className = className;
@@ -25,6 +27,7 @@ public class Event {
         this.threadName = threadName;
         this.timestamp = timestamp;
         this.stackTrace = stackTrace;
+        this.parent = parent;
     }
 
     public String getMessage() {
@@ -63,6 +66,14 @@ public class Event {
         return fileName;
     }
 
+    public Event getParent() {
+        return parent;
+    }
+
+    public String getId() {
+        return id;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -76,18 +87,20 @@ public class Event {
                 && Objects.equals(this.fileName, other.fileName)
                 && Objects.equals(this.methodName, other.methodName)
                 && Objects.equals(this.lineNumber, other.lineNumber)
-                && Objects.equals(this.threadName, other.threadName);
+                && Objects.equals(this.threadName, other.threadName)
+                && Objects.equals(this.parent, other.parent);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(message, level, className, fileName, methodName, lineNumber, threadName);
+        return Objects.hash(message, level, className, fileName, methodName, lineNumber, threadName, parent);
     }
 
     @Override
     public String toString() {
         return timestamp + " [" + threadName + "] " + level + " " + className + "." + methodName + "(" + fileName + ":" + lineNumber + ") - " 
-                + message + (stackTrace != null ? "\n" + stackTrace : "");
+                + message + (stackTrace != null ? "\n" + stackTrace : ""
+                + (parent != null ? " (parent: " + parent.getMessage() + ")" : ""));
     }
 
     public static enum Level {
@@ -104,6 +117,13 @@ public class Event {
         private Date timestamp;
         private String stackTrace;
         private String fileName;
+        private Event parent;
+        private String id;
+
+        public Builder id(String id) {
+            this.id = id;
+            return this;
+        }
 
         public Builder message(String message) {
             this.message = message;
@@ -142,7 +162,7 @@ public class Event {
         }
 
         public Event build() {
-            return new Event(message, level, className, fileName, methodName, lineNumber, threadName, timestamp, stackTrace);
+            return new Event(id, message, level, className, fileName, methodName, lineNumber, threadName, timestamp, stackTrace, parent);
         }
 
         public Builder stackTrace(String stackTrace) {
@@ -152,6 +172,11 @@ public class Event {
 
         public Builder fileName(String fileName) {
             this.fileName = fileName;
+            return this;
+        }
+
+        public Builder parent(Event parent) {
+            this.parent = parent;
             return this;
         }
     }

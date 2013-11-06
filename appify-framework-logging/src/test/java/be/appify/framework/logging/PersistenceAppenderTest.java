@@ -2,11 +2,14 @@ package be.appify.framework.logging;
 
 import be.appify.framework.persistence.Persistence;
 import be.appify.framework.persistence.Transaction;
+import ch.qos.logback.classic.Level;
+import com.google.common.collect.Lists;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Answers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -14,10 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Date;
+import java.util.List;
 
 import static org.mockito.Mockito.times;
 
-// TODO: log hierarchical events
+// TODO: commit in blocks
 @RunWith(MockitoJUnitRunner.class)
 public class PersistenceAppenderTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(PersistenceAppenderTest.class);
@@ -27,30 +31,32 @@ public class PersistenceAppenderTest {
             "Caused by: java\\.lang\\.IllegalArgumentException: Disaster!\\n" +
             "    at be\\.appify\\.framework\\.logging\\.PersistenceAppenderTest\\.createAnotherException\\(PersistenceAppenderTest\\.java:%2$s\\)\\n" +
             "    \\.\\.\\. \\d+ more\\n";
-    private PersistenceAppender persistenceAppender;
 
     @Mock
     private Persistence persistence;
 
-    @Mock
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
     private Transaction transaction;
-    private int lineNumber1;
-    private int lineNumber2;
-    private int lineNumber3;
+
+    private List<Integer> lineNumbers;
+    private HierarchicalAppenderDecorator hierarchicalAppender;
 
     @Before
     public void before() {
+        lineNumbers = Lists.newArrayList();
         ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
         new PersistenceAppender.PersistenceProvider(persistence);
-        persistenceAppender = (PersistenceAppender) root.getAppender("PERSISTENCE");
+        hierarchicalAppender = (HierarchicalAppenderDecorator) root.getAppender("PERSISTENCE_HIERARCHICAL");
+        hierarchicalAppender.setThreshold(Level.DEBUG);
+        hierarchicalAppender.setRenderHierarchy(false);
 
         Mockito.when(persistence.beginTransaction()).thenReturn(transaction);
     }
 
     @Test
     public void shouldSaveToPersistence() {
-        LOGGER.debug("Some message with parameters {} and {}", "param1", "param2"); lineNumber1 = recordLineNumber();
-        LOGGER.error("Disaster strikes!", new RuntimeException("Error", createAnotherException()));  lineNumber2 = recordLineNumber();
+        LOGGER.debug("Some message with parameters {} and {}", "param1", "param2"); recordLineNumber();
+        LOGGER.error("Disaster strikes!", new RuntimeException("Error", createAnotherException())); recordLineNumber();
 
         Event expectedEvent1 = new Event.Builder()
                 .message("Some message with parameters param1 and param2")
@@ -58,7 +64,7 @@ public class PersistenceAppenderTest {
                 .className(PersistenceAppenderTest.class.getName())
                 .fileName("PersistenceAppenderTest.java")
                 .methodName("shouldSaveToPersistence")
-                .lineNumber(lineNumber1)
+                .lineNumber(lineNumbers.get(0))
                 .threadName("main")
                 .timestamp(new Date())
                 .build();
@@ -68,34 +74,112 @@ public class PersistenceAppenderTest {
                 .className(PersistenceAppenderTest.class.getName())
                 .fileName("PersistenceAppenderTest.java")
                 .methodName("shouldSaveToPersistence")
-                .lineNumber(lineNumber2)
+                .lineNumber(lineNumbers.get(2))
                 .threadName("main")
                 .timestamp(new Date())
                 .build();
+        hierarchicalAppender.flush();
         Mockito.verify(transaction).save(expectedEvent1);
         Mockito.verify(transaction).save(Mockito.argThat(new BaseMatcher<Event>() {
             @Override
             public boolean matches(Object o) {
                 Event event = (Event) o;
-                return expectedEvent2.equals(event) && event.getStackTrace().matches(String.format(STACK_TRACE, lineNumber2, lineNumber3));
+                return expectedEvent2.equals(event) && event.getStackTrace().matches(String.format(STACK_TRACE, lineNumbers.get(2), lineNumbers.get(1)));
             }
 
             @Override
             public void describeTo(Description description) {
                 description.appendText(expectedEvent2.toString() + "\n" +
-                        String.format(STACK_TRACE, lineNumber2, lineNumber3));
+                        String.format(STACK_TRACE, lineNumbers.get(2), lineNumbers.get(1)));
             }
         }));
         Mockito.verify(transaction, times(2)).commit();
     }
 
-    private int recordLineNumber() {
-        return new Exception().getStackTrace()[1].getLineNumber();
+    @Test
+    public void shouldSetParentForHierarchicalEvents() {
+        hierarchicalAppender.suspend();
+        LOGGER.debug("Top level (1)"); recordLineNumber();
+        sublevel1(1);
+
+        Event expectedEvent1 = new Event.Builder()
+                .message("Top level (1)")
+                .level(Event.Level.DEBUG)
+                .className(PersistenceAppenderTest.class.getName())
+                .fileName("PersistenceAppenderTest.java")
+                .methodName("shouldSetParentForHierarchicalEvents")
+                .lineNumber(lineNumbers.get(0))
+                .threadName("main")
+                .timestamp(new Date())
+                .build();
+
+        final Event expectedEvent2 = new Event.Builder()
+                .message("Sublevel 1 (1)")
+                .level(Event.Level.DEBUG)
+                .className(PersistenceAppenderTest.class.getName())
+                .fileName("PersistenceAppenderTest.java")
+                .methodName("sublevel1")
+                .lineNumber(lineNumbers.get(1))
+                .threadName("main")
+                .timestamp(new Date())
+                .parent(expectedEvent1)
+                .build();
+
+        final Event expectedEvent3 = new Event.Builder()
+                .message("Sublevel 2 (1)")
+                .level(Event.Level.DEBUG)
+                .className(PersistenceAppenderTest.class.getName())
+                .fileName("PersistenceAppenderTest.java")
+                .methodName("sublevel2Debug")
+                .lineNumber(lineNumbers.get(2))
+                .threadName("main")
+                .timestamp(new Date())
+                .parent(expectedEvent2)
+                .build();
+        final Event expectedEvent4 = new Event.Builder()
+                .message("Sublevel 2 (2)")
+                .level(Event.Level.WARN)
+                .className(PersistenceAppenderTest.class.getName())
+                .fileName("PersistenceAppenderTest.java")
+                .methodName("sublevel2Warn")
+                .lineNumber(lineNumbers.get(3))
+                .threadName("main")
+                .timestamp(new Date())
+                .parent(expectedEvent2)
+                .build();
+
+
+        Mockito.when(transaction.find(Event.class).where("id").equalTo(Mockito.anyString()).asSingle()).thenReturn(
+                expectedEvent1, expectedEvent2);
+        hierarchicalAppender.resume();
+        hierarchicalAppender.flush();
+        Mockito.verify(transaction).save(expectedEvent1);
+        Mockito.verify(transaction).save(expectedEvent2);
+        Mockito.verify(transaction).save(expectedEvent3);
+        Mockito.verify(transaction).save(expectedEvent4);
+    }
+
+    private void recordLineNumber() {
+        int lineNumber = new Exception().getStackTrace()[1].getLineNumber();
+        lineNumbers.add(lineNumber);
     }
 
     private Throwable createAnotherException() {
-        lineNumber3 = recordLineNumber(); return new IllegalArgumentException("Disaster!");
+        recordLineNumber(); return new IllegalArgumentException("Disaster!");
     }
 
+    private void sublevel1(int count) {
+        LOGGER.debug("Sublevel 1 (" + count + ")"); recordLineNumber();
+        sublevel2Debug(1);
+        sublevel2Warn(2);
+    }
+
+    private void sublevel2Debug(int count) {
+        LOGGER.debug("Sublevel 2 (" + count + ")"); recordLineNumber();
+    }
+
+    private void sublevel2Warn(int count) {
+        LOGGER.warn("Sublevel 2 (" + count + ")"); recordLineNumber();
+    }
 
 }

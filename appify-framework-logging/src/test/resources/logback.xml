@@ -7,15 +7,18 @@
         </encoder>
     </appender>
 
-    <appender name="STDOUT" class="be.appify.framework.logging.HierarchicalAppenderDecorator">
+    <appender name="CONSOLE_HIERARCHICAL" class="be.appify.framework.logging.HierarchicalAppenderDecorator">
         <appender-ref ref="CONSOLE" />
     </appender>
 
     <appender name="PERSISTENCE" class="be.appify.framework.logging.PersistenceAppender"/>
 
+    <appender name="PERSISTENCE_HIERARCHICAL" class="be.appify.framework.logging.HierarchicalAppenderDecorator">
+        <appender-ref ref="PERSISTENCE" />
+    </appender>
 
     <root level="debug">
-        <appender-ref ref="STDOUT" />
-        <appender-ref ref="PERSISTENCE" />
+        <appender-ref ref="CONSOLE_HIERARCHICAL" />
+        <appender-ref ref="PERSISTENCE_HIERARCHICAL" />
     </root>
 </configuration>

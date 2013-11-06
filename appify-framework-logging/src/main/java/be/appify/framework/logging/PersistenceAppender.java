@@ -13,6 +13,7 @@ import ch.qos.logback.core.ConsoleAppender;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import java.util.Date;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
@@ -29,7 +30,7 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         Persistence persistence = PersistenceProvider.getPersistence();
         if (persistence != null) {
             Transaction transaction = persistence.beginTransaction();
-            Event event = createEvent(eventObject);
+            Event event = createEvent(eventObject, transaction);
             transaction.save(event);
             transaction.commit();
         } else {
@@ -52,7 +53,7 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         }
     }
 
-    private Event createEvent(ILoggingEvent eventObject) {
+    private Event createEvent(ILoggingEvent eventObject, Transaction transaction) {
         String message = eventObject.getFormattedMessage();
         Event.Level level = translate(eventObject.getLevel());
         StackTraceElement element = eventObject.getCallerData()[0];
@@ -64,7 +65,10 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         IThrowableProxy throwableProxy = eventObject.getThrowableProxy();
         String fileName = element.getFileName();
         String stackTrace = buildStackTrace(throwableProxy);
+        Event parent = findParent(eventObject, transaction);
+        String id = idOf(eventObject);
         return new Event.Builder()
+                .id(id)
                 .message(message)
                 .level(level)
                 .className(className)
@@ -74,7 +78,27 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
                 .threadName(threadName)
                 .timestamp(timestamp)
                 .stackTrace(stackTrace)
+                .parent(parent)
                 .build();
+    }
+
+    private String idOf(ILoggingEvent eventObject) {
+        if(!(eventObject instanceof HierarchicalLoggingEvent)) {
+            return UUID.randomUUID().toString();
+        }
+        return ((HierarchicalLoggingEvent) eventObject).getId();
+    }
+
+    private Event findParent(ILoggingEvent eventObject, Transaction transaction) {
+        if(!(eventObject instanceof HierarchicalLoggingEvent)) {
+            return null;
+        }
+        HierarchicalLoggingEvent hierarchicalLoggingEvent = (HierarchicalLoggingEvent) eventObject;
+        HierarchicalLoggingEvent parent = hierarchicalLoggingEvent.getParent();
+        if(parent == null) {
+            return null;
+        }
+        return transaction.find(Event.class).where("id").equalTo(parent.getId()).asSingle();
     }
 
     private String buildStackTrace(IThrowableProxy throwableProxy) {
