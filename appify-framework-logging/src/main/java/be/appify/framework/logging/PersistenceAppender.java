@@ -13,13 +13,18 @@ import ch.qos.logback.core.ConsoleAppender;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
+    private static final long TRANSACTION_COMMIT_DELAY = 250;
     private Appender<ILoggingEvent> fallbackAppender;
     private ConsoleAppender<ILoggingEvent> systemErrorAppender = new ConsoleAppender<>();
     private AtomicBoolean fallbackReported = new AtomicBoolean(false);
+    private Timer transactionTimer;
+    private Transaction currentTransaction;
 
     public PersistenceAppender() {
         systemErrorAppender.setTarget("System.err");
@@ -29,13 +34,18 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
     protected void append(ILoggingEvent eventObject) {
         Persistence persistence = PersistenceProvider.getPersistence();
         if (persistence != null) {
-            Transaction transaction = persistence.beginTransaction();
-            Event event = createEvent(eventObject, transaction);
-            transaction.save(event);
-            transaction.commit();
+            try {
+                Transaction transaction = requestTransaction(persistence);
+                Event event = createEvent(eventObject, transaction);
+                transaction.save(event);
+                finishedWith(transaction);
+            } catch (Throwable t) {
+                currentTransaction.rollback();
+                currentTransaction = null;
+            }
         } else {
             if(!fallbackReported.compareAndSet(true, true)) {
-                reportFallback();
+                reportFallback(eventObject);
             }
             if(fallbackAppender != null) {
                 fallbackAppender.doAppend(eventObject);
@@ -45,12 +55,41 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         }
     }
 
-    private void reportFallback() {
-        if(fallbackAppender != null) {
-            fallbackAppender.addWarn("Persistence not set for appender " + getName() + ", falling back to " + fallbackAppender.getName() + ".");
-        } else {
-            systemErrorAppender.addWarn("Persistence not set for appender " + getName() + " and no fallback appender is defined, falling back to System.err.");
+    private synchronized void finishedWith(final Transaction transaction) {
+        if(transactionTimer != null) {
+            transactionTimer.cancel();
         }
+        transactionTimer = new Timer();
+        transactionTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                synchronized (PersistenceAppender.this) {
+                    transaction.commit();
+                    currentTransaction = null;
+                    transactionTimer = null;
+                }
+            }
+        }, TRANSACTION_COMMIT_DELAY);
+    }
+
+    private synchronized Transaction requestTransaction(Persistence persistence) {
+        if(currentTransaction == null) {
+            currentTransaction = persistence.beginTransaction();
+        }
+        return currentTransaction;
+    }
+
+    private void reportFallback(ILoggingEvent eventObject) {
+        if(fallbackAppender != null) {
+            fallbackAppender.doAppend(warn(eventObject, "Persistence not set for appender " + getName() + ", falling back to " + fallbackAppender.getName() + "."));
+        } else {
+            systemErrorAppender.doAppend(warn(eventObject, "Persistence not set for appender " + getName() + " and no fallback appender is defined, falling back to System.err."));
+        }
+    }
+
+    private ILoggingEvent warn(ILoggingEvent eventObject, String message) {
+        // TODO
+        return null;
     }
 
     private Event createEvent(ILoggingEvent eventObject, Transaction transaction) {
