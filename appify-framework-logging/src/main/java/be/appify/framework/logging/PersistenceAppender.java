@@ -9,13 +9,11 @@ import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import ch.qos.logback.core.Appender;
 import ch.qos.logback.core.AppenderBase;
 import ch.qos.logback.core.ConsoleAppender;
+import com.google.common.collect.Lists;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import java.util.Date;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
@@ -25,9 +23,14 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
     private AtomicBoolean fallbackReported = new AtomicBoolean(false);
     private Timer transactionTimer;
     private Transaction currentTransaction;
+    private List<ILoggingEvent> uncommittedEvents = Lists.newArrayList();
 
     public PersistenceAppender() {
         systemErrorAppender.setTarget("System.err");
+    }
+
+    public void reset() {
+        fallbackReported.set(false);
     }
 
     @Override
@@ -35,27 +38,44 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         Persistence persistence = PersistenceProvider.getPersistence();
         if (persistence != null) {
             try {
-                Transaction transaction = requestTransaction(persistence);
-                Event event = createEvent(eventObject, transaction);
-                transaction.save(event);
-                finishedWith(transaction);
+                synchronized (this) {
+                    uncommittedEvents.add(eventObject);
+                }
+                requestTransaction(persistence);
+                Event event = createEvent(eventObject);
+                currentTransaction.save(event);
+                endTransaction();
             } catch (Throwable t) {
-                currentTransaction.rollback();
-                currentTransaction = null;
+                if(transactionTimer != null) {
+                    transactionTimer.cancel();
+                }
+                fallbackAppendUncommittedEvents(t);
             }
         } else {
-            if(!fallbackReported.compareAndSet(true, true)) {
-                reportFallback(eventObject);
+            if(!fallbackReported.getAndSet(true)) {
+                reportFallback();
             }
-            if(fallbackAppender != null) {
-                fallbackAppender.doAppend(eventObject);
-            } else {
-                systemErrorAppender.doAppend(eventObject);
-            }
+            fallbackAppend(eventObject);
         }
     }
 
-    private synchronized void finishedWith(final Transaction transaction) {
+    private void fallbackAppend(ILoggingEvent eventObject) {
+        if(fallbackAppender != null) {
+            fallbackAppender.doAppend(eventObject);
+        } else {
+            systemErrorAppender.doAppend(eventObject);
+        }
+    }
+
+    private void reportFallback(Throwable t) {
+        if(fallbackAppender != null) {
+            addError("Appender " + getName() + " threw exception when logging an event, falling back to appender " + fallbackAppender.getName() + ".", t);
+        } else {
+            addError("Appender " + getName() + " threw exception when logging an event and no fallback appender is defined, falling back to System.err.", t);
+        }
+    }
+
+    private synchronized void endTransaction() {
         if(transactionTimer != null) {
             transactionTimer.cancel();
         }
@@ -64,35 +84,50 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
             @Override
             public void run() {
                 synchronized (PersistenceAppender.this) {
-                    transaction.commit();
-                    currentTransaction = null;
-                    transactionTimer = null;
+                    try {
+                        currentTransaction.commit();
+                        uncommittedEvents.clear();
+                    } catch (Throwable t) {
+                        fallbackAppendUncommittedEvents(t);
+                    } finally {
+                        currentTransaction = null;
+                        transactionTimer = null;
+                    }
                 }
             }
         }, TRANSACTION_COMMIT_DELAY);
     }
 
-    private synchronized Transaction requestTransaction(Persistence persistence) {
+    private synchronized void fallbackAppendUncommittedEvents(Throwable t) {
+        try {
+            currentTransaction.rollback();
+        } catch (Throwable t2) {
+        }
+        currentTransaction = null;
+        if(!fallbackReported.getAndSet(true)) {
+            reportFallback(t);
+        }
+        for(ILoggingEvent event : uncommittedEvents) {
+            fallbackAppend(event);
+        }
+        uncommittedEvents.clear();
+    }
+
+    private synchronized void requestTransaction(Persistence persistence) {
         if(currentTransaction == null) {
             currentTransaction = persistence.beginTransaction();
         }
-        return currentTransaction;
     }
 
-    private void reportFallback(ILoggingEvent eventObject) {
+    private void reportFallback() {
         if(fallbackAppender != null) {
-            fallbackAppender.doAppend(warn(eventObject, "Persistence not set for appender " + getName() + ", falling back to " + fallbackAppender.getName() + "."));
+            addWarn("Persistence not set for appender " + getName() + ", falling back to " + fallbackAppender.getName() + ".");
         } else {
-            systemErrorAppender.doAppend(warn(eventObject, "Persistence not set for appender " + getName() + " and no fallback appender is defined, falling back to System.err."));
+            addWarn("Persistence not set for appender " + getName() + " and no fallback appender is defined, falling back to System.err.");
         }
     }
 
-    private ILoggingEvent warn(ILoggingEvent eventObject, String message) {
-        // TODO
-        return null;
-    }
-
-    private Event createEvent(ILoggingEvent eventObject, Transaction transaction) {
+    private Event createEvent(ILoggingEvent eventObject) {
         String message = eventObject.getFormattedMessage();
         Event.Level level = translate(eventObject.getLevel());
         StackTraceElement element = eventObject.getCallerData()[0];
@@ -104,7 +139,7 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         IThrowableProxy throwableProxy = eventObject.getThrowableProxy();
         String fileName = element.getFileName();
         String stackTrace = buildStackTrace(throwableProxy);
-        Event parent = findParent(eventObject, transaction);
+        Event parent = findParent(eventObject);
         String id = idOf(eventObject);
         return new Event.Builder()
                 .id(id)
@@ -128,7 +163,7 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         return ((HierarchicalLoggingEvent) eventObject).getId();
     }
 
-    private Event findParent(ILoggingEvent eventObject, Transaction transaction) {
+    private Event findParent(ILoggingEvent eventObject) {
         if(!(eventObject instanceof HierarchicalLoggingEvent)) {
             return null;
         }
@@ -137,7 +172,7 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         if(parent == null) {
             return null;
         }
-        return transaction.find(Event.class).where("id").equalTo(parent.getId()).asSingle();
+        return currentTransaction.find(Event.class).where("id").equalTo(parent.getId()).asSingle();
     }
 
     private String buildStackTrace(IThrowableProxy throwableProxy) {

@@ -3,8 +3,11 @@ package be.appify.framework.logging;
 import be.appify.framework.persistence.Persistence;
 import be.appify.framework.persistence.Transaction;
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
+import ch.qos.logback.core.status.Status;
+import ch.qos.logback.core.status.StatusManager;
 import com.google.common.collect.Lists;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
@@ -45,16 +48,22 @@ public class PersistenceAppenderTest {
     private List<Integer> lineNumbers;
     private HierarchicalAppenderDecorator hierarchicalAppender;
 
+    @Mock
+    private StatusManager statusManager;
+
     @Before
     public void before() {
         lineNumbers = Lists.newArrayList();
         ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+        LoggerContext loggerContext = root.getLoggerContext();
+        loggerContext.setStatusManager(statusManager);
         new PersistenceAppender.PersistenceProvider(persistence);
         hierarchicalAppender = (HierarchicalAppenderDecorator) root.getAppender("PERSISTENCE_HIERARCHICAL");
         hierarchicalAppender.setThreshold(Level.DEBUG);
         hierarchicalAppender.setRenderHierarchy(false);
 
         PersistenceAppender persistenceAppender = (PersistenceAppender) hierarchicalAppender.getDecoratedAppender();
+        persistenceAppender.reset();
         persistenceAppender.setFallbackAppender(fallbackAppender);
 
         Mockito.when(fallbackAppender.getName()).thenReturn("MOCK");
@@ -64,10 +73,21 @@ public class PersistenceAppenderTest {
             @Override
             public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
                 ILoggingEvent event = (ILoggingEvent) invocationOnMock.getArguments()[0];
-                System.out.println(new Date(event.getTimeStamp()) + " " + event.getFormattedMessage());
+                System.out.println(new Date(event.getTimeStamp()) + " " + event.getLevel() + " " + event.getFormattedMessage());
                 return null;
             }
         }).when(fallbackAppender).doAppend(Mockito.any(ILoggingEvent.class));
+        Mockito.doAnswer(new Answer() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+                Status status = (Status) invocationOnMock.getArguments()[0];
+                System.err.println(new Date(status.getDate()) + " " + Level.toLevel(status.getLevel()) + " " + status.getMessage());
+                if(status.getThrowable() != null) {
+                    status.getThrowable().printStackTrace();
+                }
+                return null;
+            }
+        }).when(statusManager).add(Mockito.any(Status.class));
     }
 
     @Test
@@ -120,8 +140,22 @@ public class PersistenceAppenderTest {
         LOGGER.debug("Some message with parameters {} and {}", "param1", "param2"); recordLineNumber();
         hierarchicalAppender.flush();
 
-        Mockito.verify(fallbackAppender).doAppend(logEvent("Persistence not set for appender PERSISTENCE, falling back to MOCK."));
+        Mockito.verify(statusManager).add(logStatus("Persistence not set for appender PERSISTENCE, falling back to MOCK."));
         Mockito.verify(fallbackAppender).doAppend(logEvent("Some message with parameters param1 and param2"));
+    }
+
+    private Status logStatus(final String message) {
+        return Mockito.argThat(new BaseMatcher<Status>() {
+            @Override
+            public boolean matches(Object o) {
+                return o instanceof Status && message.equals(((Status) o).getMessage());
+            }
+
+            @Override
+            public void describeTo(Description description) {
+                description.appendText(message);
+            }
+        });
     }
 
     private ILoggingEvent logEvent(final String message) {
@@ -139,19 +173,33 @@ public class PersistenceAppenderTest {
     }
 
     @Test
-    public void shouldFallBackWhenPersistenceThrowsException() {
+    public void shouldFallBackWhenInsertThrowsException() throws InterruptedException {
         Mockito.doThrow(new RuntimeException("Dang!")).when(transaction).save(Mockito.any());
         LOGGER.debug("Some message with parameters {} and {}", "param1", "param2");
         LOGGER.debug("Another message");
         hierarchicalAppender.flush();
 
-        Mockito.verify(fallbackAppender).doAppend(logEvent("Appender PERSISTENCE threw exception when logging an event, falling back to MOCK"));
+        Thread.sleep(300);
+        Mockito.verify(statusManager).add(logStatus("Appender PERSISTENCE threw exception when logging an event, falling back to appender MOCK."));
         Mockito.verify(fallbackAppender).doAppend(logEvent("Some message with parameters param1 and param2"));
         Mockito.verify(fallbackAppender).doAppend(logEvent("Another message"));
     }
 
     @Test
-    public void shouldSetParentForHierarchicalEvents() {
+    public void shouldFallBackWhenCommitThrowsException() throws InterruptedException {
+        Mockito.doThrow(new RuntimeException("Dang!")).when(transaction).commit();
+        LOGGER.debug("Some message with parameters {} and {}", "param1", "param2");
+        LOGGER.debug("Another message");
+        hierarchicalAppender.flush();
+
+        Thread.sleep(300);
+        Mockito.verify(statusManager).add(logStatus("Appender PERSISTENCE threw exception when logging an event, falling back to appender MOCK."));
+        Mockito.verify(fallbackAppender).doAppend(logEvent("Some message with parameters param1 and param2"));
+        Mockito.verify(fallbackAppender).doAppend(logEvent("Another message"));
+    }
+
+    @Test
+    public void shouldSetParentForHierarchicalEvents() throws InterruptedException {
         hierarchicalAppender.suspend();
         LOGGER.debug("Top level (1)"); recordLineNumber();
         sublevel1(1);
@@ -204,9 +252,10 @@ public class PersistenceAppenderTest {
 
 
         Mockito.when(transaction.find(Event.class).where("id").equalTo(Mockito.anyString()).asSingle()).thenReturn(
-                expectedEvent1, expectedEvent2);
+                expectedEvent1, expectedEvent2, expectedEvent2);
         hierarchicalAppender.resume();
         hierarchicalAppender.flush();
+        Thread.sleep(300);
         Mockito.verify(transaction).save(expectedEvent1);
         Mockito.verify(transaction).save(expectedEvent2);
         Mockito.verify(transaction).save(expectedEvent3);
