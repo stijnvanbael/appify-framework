@@ -102,6 +102,7 @@ public class PersistenceAppender extends AppenderBase<ILoggingEvent> {
         try {
             currentTransaction.rollback();
         } catch (Throwable t2) {
+            addError("Failed to rollback transaction." , t2);
         }
         currentTransaction = null;
         if(!fallbackReported.getAndSet(true)) {

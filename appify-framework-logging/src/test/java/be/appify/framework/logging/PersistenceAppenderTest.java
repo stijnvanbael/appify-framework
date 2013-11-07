@@ -81,13 +81,23 @@ public class PersistenceAppenderTest {
             @Override
             public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
                 Status status = (Status) invocationOnMock.getArguments()[0];
-                System.err.println(new Date(status.getDate()) + " " + Level.toLevel(status.getLevel()) + " " + status.getMessage());
+                System.err.println(new Date(status.getDate()) + " " + statusLevelToString(status.getLevel()) + " " + status.getMessage());
                 if(status.getThrowable() != null) {
                     status.getThrowable().printStackTrace();
                 }
                 return null;
             }
         }).when(statusManager).add(Mockito.any(Status.class));
+    }
+
+    private String statusLevelToString(int level) {
+        switch (level) {
+            case Status.WARN:
+                return "WARN";
+            case Status.ERROR:
+                return "ERROR";
+        }
+        return "INFO";
     }
 
     @Test
