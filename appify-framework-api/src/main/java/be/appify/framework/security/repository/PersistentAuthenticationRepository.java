@@ -50,4 +50,9 @@ public class PersistentAuthenticationRepository<U extends User> extends Abstract
 		});
 	}
 
+    @Override
+    public Authentication<U> findByUser(U user) {
+        return null;
+    }
+
 }

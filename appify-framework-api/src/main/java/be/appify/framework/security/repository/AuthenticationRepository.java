@@ -9,4 +9,6 @@ public interface AuthenticationRepository<U extends User> {
 	void store(Authentication<U> authentication);
 
 	void delete(Authentication<U> authentication);
+
+    Authentication<U> findByUser(U user);
 }

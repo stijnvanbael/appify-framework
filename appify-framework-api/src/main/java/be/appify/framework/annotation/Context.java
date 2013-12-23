@@ -1,4 +1,4 @@
-package be.appify.framework.view.web.annotation;
+package be.appify.framework.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

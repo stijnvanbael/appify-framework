@@ -27,42 +27,65 @@ public class SimpleAuthenticationService<U extends User> extends AbstractAuthent
 
 	@Override
 	public Authentication<U> authenticate(SimpleCredential<U> credential, boolean keepAuthenticated) throws NotAuthenticatedException {
-		@SuppressWarnings("unchecked")
-		U user = (U) userRepository.findByEmailAddress(credential.getUsername());
-		if (user == null) {
-			throw new NotAuthenticatedException("Failed to authenticate user with e-mail address: " + credential.getUsername());
-		}
-		@SuppressWarnings("unchecked")
-		SimpleCredential<U> actualCredential = user.getCredential(SimpleCredential.class);
-		if (actualCredential == null || !actualCredential.checkPassword(credential)) {
-			throw new NotAuthenticatedException("Failed to authenticate user with e-mail address: " + credential.getUsername());
-		}
-		Authentication<U> authentication = new Authentication<U>(user, Instant.now().plus(getTimeAuthenticationValid()));
-		if (keepAuthenticated) {
-			authenticationRepository.store(authentication);
-			setCookie(AUTHENTICATION_TOKEN, authentication.getId(), (int) (getTimeAuthenticationValid().getMillis() / 1000));
-		}
+        U user = findUser(credential);
+        checkCredential(credential, user);
+
+        Authentication<U> existingAuthentication = authenticationRepository.findByUser(user);
+        if(existingAuthentication != null) cancel(existingAuthentication);
+
+        Authentication<U> authentication = new Authentication<U>(user, Instant.now().plus(getTimeAuthenticationValid()));
+		if (keepAuthenticated) persistAuthentication(authentication);
 		return authentication;
 	}
 
-	@Override
+    private void persistAuthentication(Authentication<U> authentication) {
+        authenticationRepository.store(authentication);
+        setCookie(AUTHENTICATION_TOKEN, authentication.getId(), (int) (getTimeAuthenticationValid().getMillis() / 1000));
+    }
+
+    private U findUser(SimpleCredential<U> credential) throws NotAuthenticatedException {
+        @SuppressWarnings("unchecked")
+        U user = (U) userRepository.findByEmailAddress(credential.getUsername());
+        if (user == null)
+            throw new NotAuthenticatedException("Failed to authenticate user with e-mail address: " + credential.getUsername());
+
+        return user;
+    }
+
+    private void checkCredential(SimpleCredential<U> credential, U user) throws NotAuthenticatedException {
+        @SuppressWarnings("unchecked")
+        SimpleCredential<U> actualCredential = user.getCredential(SimpleCredential.class);
+        if (actualCredential == null || !actualCredential.checkPassword(credential))
+            throw new NotAuthenticatedException("Failed to authenticate user with e-mail address: " + credential.getUsername());
+
+    }
+
+    @Override
 	public Authentication<U> autoAuthenticate() throws NotAuthenticatedException {
 		String authenticationToken = findCookie(AUTHENTICATION_TOKEN);
-		if (StringUtils.isNotBlank(authenticationToken)) {
-			Authentication<U> authentication = authenticationRepository.findByToken(authenticationToken);
-			if (authentication != null) {
-				if (!authentication.isExpired()) {
-					return authentication;
-				}
-				cancel(authentication);
-				throw new NotAuthenticatedException("Authentication for token " + authenticationToken + " expired on " + authentication.getExpiresOn());
-			}
-			throw new NotAuthenticatedException("Invalid authentication token: " + authenticationToken);
-		}
+		if (StringUtils.isNotBlank(authenticationToken))
+            return authenticateWithToken(authenticationToken);
+
 		throw new NotAuthenticatedException("No authentication token found");
 	}
 
-	@Override
+    private Authentication<U> authenticateWithToken(String authenticationToken) throws NotAuthenticatedException {
+        Authentication<U> authentication = authenticationRepository.findByToken(authenticationToken);
+        if (authentication != null)
+            return checkAuthentication(authenticationToken, authentication);
+
+        throw new NotAuthenticatedException("Invalid authentication token: " + authenticationToken);
+    }
+
+    private Authentication<U> checkAuthentication(String authenticationToken, Authentication<U> authentication) throws NotAuthenticatedException {
+        if (!authentication.isExpired())
+            return authentication;
+
+        cancel(authentication);
+        throw new NotAuthenticatedException("Authentication for token " + authenticationToken + " expired on " + authentication.getExpiresOn());
+    }
+
+    @Override
 	public void cancel(Authentication<U> authentication) {
 		authentication = authenticationRepository.findByToken(authentication.getId());
 		if (authentication != null) {
