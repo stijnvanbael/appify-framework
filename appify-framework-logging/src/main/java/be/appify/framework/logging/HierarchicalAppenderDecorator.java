@@ -5,15 +5,15 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.google.common.collect.Maps;
 
 import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 
 public class HierarchicalAppenderDecorator extends DecoratingAppender {
     private Map<String, ThreadHistory> threads = Maps.newConcurrentMap();
     private Level threshold = Level.WARN;
+    private boolean renderHierarchy = true;
     private CountDownLatch eventsAvailable = new CountDownLatch(1);
     private CountDownLatch flushed;
+    private CountDownLatch resumed;
 
     public HierarchicalAppenderDecorator() {
         new Thread(new Runnable() {
@@ -25,6 +25,13 @@ public class HierarchicalAppenderDecorator extends DecoratingAppender {
                     if(done) {
                         try {
                             eventsAvailable.await();
+                        } catch (InterruptedException e) {
+                            break;
+                        }
+                    }
+                    if(resumed != null) {
+                        try {
+                            resumed.await();
                         } catch (InterruptedException e) {
                             break;
                         }
@@ -49,6 +56,10 @@ public class HierarchicalAppenderDecorator extends DecoratingAppender {
             }
         }, "Hierarchical appender").start();
 
+    }
+
+    public void setRenderHierarchy(boolean renderHierarchy) {
+        this.renderHierarchy = renderHierarchy;
     }
 
     private boolean writeEvents() {
@@ -77,7 +88,9 @@ public class HierarchicalAppenderDecorator extends DecoratingAppender {
             history = new ThreadHistory(threadName, threshold);
             threads.put(threadName, history);
         }
-        history.addEvent(new HierarchicalLoggingEvent(event));
+        HierarchicalLoggingEvent hierarchicalEvent = new HierarchicalLoggingEvent(event);
+        hierarchicalEvent.setRenderHierarchy(renderHierarchy);
+        history.addEvent(hierarchicalEvent);
         eventsAvailable.countDown();
     }
 
@@ -96,5 +109,13 @@ public class HierarchicalAppenderDecorator extends DecoratingAppender {
             flushed.await();
         } catch (InterruptedException e) {
         }
+    }
+
+    public void suspend() {
+        resumed = new CountDownLatch(1);
+    }
+
+    public void resume() {
+        resumed.countDown();
     }
 }
